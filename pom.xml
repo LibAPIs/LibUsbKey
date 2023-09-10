@@ -7,16 +7,16 @@
 	</organization>
 
 	<groupId>com.mclarkdev.tools</groupId>
-	<artifactId>libwebsvc</artifactId>
-	<version>1.2</version>
+	<artifactId>libusbkey</artifactId>
+	<version>1.5.1</version>
 	<packaging>jar</packaging>
 
-	<name>libwebsvc</name>
-	<url>https://about.mclarkdev.com/posts/1097/libapis/</url>
-	<description>A collection of tools for easily starting a Jetty server.</description>
+	<name>libusbkey</name>
+	<url>https://git.mclarkdev.com/LibAPIs/LibUsbKey.git</url>
+	<description>A basic USB HID interface for communicating with ATSAMD21 firmware.</description>
 
 	<scm>
-		<url>https://git.mclarkdev.com/MClarkDev.com--Public/libwebsvc.git</url>
+		<url>https://git.mclarkdev.com/LibAPIs/LibUsbKey.git</url>
 	</scm>
 
 	<licenses>
@@ -46,7 +46,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>3.1.0</version>
+				<version>3.3.0</version>
 				<executions>
 					<execution>
 						<id>attach-sources</id>
@@ -59,7 +59,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>3.1.1</version>
+				<version>3.5.0</version>
 				<executions>
 					<execution>
 						<id>attach-javadocs</id>
@@ -72,7 +72,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-gpg-plugin</artifactId>
-				<version>3.0.1</version>
+				<version>3.1.0</version>
 				<executions>
 					<execution>
 						<id>sign-artifacts</id>
@@ -90,7 +90,12 @@
 		<dependency>
 			<groupId>com.mclarkdev.tools</groupId>
 			<artifactId>liblog</artifactId>
-			<version>1.1</version>
+			<version>1.5.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.mclarkdev.tools</groupId>
+			<artifactId>libextras</artifactId>
+			<version>1.5.1</version>
 		</dependency>
 		<dependency>
 			<groupId>org.hid4java</groupId>

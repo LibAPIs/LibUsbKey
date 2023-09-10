@@ -1,5 +1,7 @@
 package com.mclarkdev.tools.libusbkey;
 
+import java.io.IOException;
+
 import org.hid4java.HidDevice;
 import org.hid4java.HidManager;
 import org.hid4java.HidServices;
@@ -7,18 +9,19 @@ import org.hid4java.HidServicesListener;
 import org.hid4java.HidServicesSpecification;
 import org.hid4java.event.HidServicesEvent;
 
-public class LibUsbKey implements HidServicesListener {
+import com.mclarkdev.tools.libextras.LibExtrasStrings;
+import com.mclarkdev.tools.liblog.LibLog;
 
-	private final int PACKET_SIZE = 16;
+/**
+ * LibUsbKey // LibUsbKey
+ * 
+ * A basic USB HID interface for communicating with ATSAMD21 firmware.
+ */
+public class LibUsbKey {
 
-	private final int KEY_VENDOR = 0x239a;
-	private final int KEY_PRODUCT = 0x80ef;
-
-	private static final LibUsbKey libUsbKey = new LibUsbKey();
-
-	public static LibUsbKey instance() {
-		return libUsbKey;
-	}
+	private final int deviceVendor;
+	private final int deviceProduct;
+	private final int devicePacketSize;
 
 	private final HidServices hidServices;
 
@@ -26,25 +29,49 @@ public class LibUsbKey implements HidServicesListener {
 
 	private HidDevice usbKey = null;
 
-	private LibUsbKey() {
+	/**
+	 * Create a new object instance with the desired VENDOR/PRODUCT key.
+	 * 
+	 * @param vendor  device vendor code
+	 * @param product device product code
+	 */
+	public LibUsbKey(int vendor, int product) {
+		this(vendor, product, 16);
+	}
 
+	/**
+	 * Create a new object instance with the desired VENDOR/PRODUCT key.
+	 * 
+	 * @param vendor     device vendor code
+	 * @param product    device product code
+	 * @param packetSize device packet size
+	 */
+	public LibUsbKey(int vendor, int product, int packetSize) {
+
+		// device specifics
+		this.deviceVendor = vendor;
+		this.deviceProduct = product;
+		this.devicePacketSize = packetSize;
+
+		// Configuration for auto-start
 		HidServicesSpecification hidServicesSpecification = //
 				new HidServicesSpecification();
 		hidServicesSpecification.setAutoStart(false);
-		// hidServicesSpecification.setScanInterval(100);
 
 		// Get HID services using custom specification
 		hidServices = HidManager.getHidServices(hidServicesSpecification);
-		hidServices.addHidServicesListener(this);
+		hidServices.addHidServicesListener(serviceListener);
 		hidServices.start();
-
 		enumerate();
 	}
 
+	/**
+	 * Enumerate all attached HID devices.
+	 */
 	private void enumerate() {
 
 		// Use HID services to find the UsbKey device
-		usbKey = hidServices.getHidDevice(KEY_VENDOR, KEY_PRODUCT, null);
+		usbKey = hidServices.getHidDevice(deviceVendor, deviceProduct, null);
 		boolean state = (usbKey != null);
 
 		// skip if same state
@@ -64,92 +91,93 @@ public class LibUsbKey implements HidServicesListener {
 		fork();
 	}
 
+	/**
+	 * Fork a background thread to process incoming packets.
+	 */
 	private void fork() {
 		new Thread() {
 
 			public void run() {
 
-				System.out.print("Connected: ");
-				System.out.println(usbKey);
+				LibLog.log("USB", "Connected: " + usbKey.toString());
 
 				while (usbKey.isOpen()) {
 
-					byte[] read = new byte[PACKET_SIZE];
+					byte[] read = new byte[devicePacketSize];
 					int num = usbKey.read(read);
 					if (num <= 0) {
 						break;
 					}
 
-					String msg = new String(read, 0, num);
-					System.out.println("Message: " + msg);
-					System.out.println("RAW: " + bytesToHex(read));
+					LibLog.log("USB", "RAW: " + LibExtrasStrings.bytesToHex(read));
 				}
 
-				System.out.print("Done.");
+				LibLog.log("USB", "Done.");
 			}
 		}.start();
 	}
 
-	@Override
-	public void hidDeviceAttached(HidServicesEvent event) {
+	private HidServicesListener serviceListener = new HidServicesListener() {
 
-		System.out.print("Found: ");
-		System.out.println(event.toString());
+		/**
+		 * Called when a new device is attached.
+		 */
+		@Override
+		public void hidDeviceAttached(HidServicesEvent event) {
 
-		enumerate();
-	}
+			LibLog.log("USB", "Found: " + event.toString());
+			enumerate();
+		}
 
-	@Override
-	public void hidDeviceDetached(HidServicesEvent event) {
+		/**
+		 * Called when a device is disconnected.
+		 */
+		@Override
+		public void hidDeviceDetached(HidServicesEvent event) {
 
-		System.out.print("Lost: ");
-		System.out.println(event.toString());
+			LibLog.log("USB", "Lost: " + event.toString());
+			enumerate();
+		}
 
-		enumerate();
-	}
+		/**
+		 * Called when a device detects a failure.
+		 */
+		@Override
+		public void hidFailure(HidServicesEvent event) {
 
-	@Override
-	public void hidFailure(HidServicesEvent event) {
+			LibLog.log("USB", "Failed: " + event.toString());
+			enumerate();
+		}
+	};
 
-		System.out.print("Failed: ");
-		System.out.println(event.toString());
-
-		enumerate();
-	}
-
+	/**
+	 * Check if the device is connected.
+	 * 
+	 * @return device is connected and ready
+	 */
 	public boolean isConnected() {
-		return (usbKey != null);
+		return (usbKey != null && usbKey.isOpen());
 	}
 
-	public void write(byte[] bytes) {
-		if (usbKey == null) {
-			return;
+	/**
+	 * Write a given payload to the device.
+	 * 
+	 * @param bytes the data to write
+	 */
+	public void write(byte[] bytes) throws IOException {
+
+		if (usbKey == null || (!usbKey.isOpen())) {
+			throw new IOException("no device");
 		}
 
 		synchronized (usbKey) {
-			usbKey.write(bytes, PACKET_SIZE, (byte) 0x00);
-			System.out.print("Wrote: ");
-			System.out.println(bytesToHex(bytes));
+
+			try {
+				usbKey.write(bytes, devicePacketSize, (byte) 0x00);
+				LibLog.log("USB", "Wrote: " + LibExtrasStrings.bytesToHex(bytes));
+			} catch (IllegalStateException e) {
+				throw new IOException(e);
+			}
 		}
-	}
-
-	public static String bytesToHex(byte[] bytes) {
-
-		if (bytes == null) {
-
-			throw new IllegalArgumentException("supplied value cannot be null");
-		}
-
-		char[] hexArray = "0123456789ABCDEF".toCharArray();
-
-		char[] hexChars = new char[bytes.length * 2];
-
-		for (int j = 0; j < bytes.length; j++) {
-
-			int v = bytes[j] & 0xFF;
-			hexChars[j * 2] = hexArray[v >>> 4];
-			hexChars[j * 2 + 1] = hexArray[v & 0x0F];
-		}
-		return new String(hexChars);
 	}
 }
